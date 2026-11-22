@@ -11,6 +11,7 @@ import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
 import { reopenClosedConversation } from '@/lib/conversations/reopen'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
+import { dispatchN8nEvent } from '@/lib/n8n/events'
 
 export const maxDuration = 60
 
@@ -297,6 +298,20 @@ export async function POST(request: Request) {
         contactId,
         configOwnerUserId: ownerId,
         inboundMessageId: event.messageId,
+      })
+      await dispatchN8nEvent({
+        accountId,
+        event: 'message.received',
+        payload: {
+          channel: 'whatsapp_qr',
+          conversation_id: convId,
+          contact_id: contactId,
+          contact_name: contact.name ?? null,
+          contact_phone: contact.phone ?? normalized,
+          message_id: insertedMsg?.id ?? event.messageId,
+          message_text: textBody,
+          timestamp: event.timestamp,
+        },
       })
     } catch (err) {
       console.error('[whatsapp/qr/webhook] async dispatch error:', err)

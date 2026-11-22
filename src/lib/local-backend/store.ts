@@ -60,6 +60,7 @@ const KNOWN_TABLES = [
   'automation_steps',
   'automation_logs',
   'automation_pending_steps',
+  'automation_pending_executions',
   'flows',
   'flow_nodes',
   'flow_runs',
@@ -73,6 +74,7 @@ const KNOWN_TABLES = [
   'api_keys',
   'webhook_endpoints',
   'webhook_deliveries',
+  'n8n_integrations',
 ] as const;
 
 export function hashPassword(password: string): string {

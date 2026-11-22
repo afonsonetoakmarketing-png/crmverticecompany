@@ -156,6 +156,47 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
         issues.push({ path: `${path}.url`, message: t('webhookUrlInvalid') })
       }
       break
+    case 'http_request': {
+      const method = String(c.method ?? 'POST').toUpperCase()
+      if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        issues.push({ path: `${path}.method`, message: 'Método HTTP inválido' })
+      }
+      if (!nonEmpty(c.url)) {
+        issues.push({ path: `${path}.url`, message: t('webhookUrlRequired') })
+        break
+      }
+      // Allow URLs with {{variables}} by replacing template tokens with a safe placeholder before URL parsing
+      const sanitizedUrl = String(c.url).replace(/\{\{[^}]+\}\}/g, 'placeholder')
+      try {
+        const u = new URL(sanitizedUrl)
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          issues.push({
+            path: `${path}.url`,
+            message: t('webhookUrlScheme'),
+          })
+        }
+      } catch {
+        issues.push({ path: `${path}.url`, message: t('webhookUrlInvalid') })
+      }
+      break
+    }
+    case 'ai_agent':
+      if (!nonEmpty(c.prompt)) {
+        issues.push({
+          path: `${path}.prompt`,
+          message: 'O prompt do Agente de IA é obrigatório',
+        })
+      }
+      if (
+        c.output_mode === 'update_contact_field' &&
+        !nonEmpty(c.contact_field)
+      ) {
+        issues.push({
+          path: `${path}.contact_field`,
+          message: t('fieldNameRequired'),
+        })
+      }
+      break
     case 'close_conversation':
       // No config required.
       break

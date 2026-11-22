@@ -33,6 +33,8 @@ import {
   ArrowUp,
   MousePointerClick,
   List,
+  Globe,
+  Sparkles,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -133,6 +135,8 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   wait: { label: "wait", icon: Hourglass, border: "border-l-border" },
   condition: { label: "condition", icon: GitBranch, border: "border-l-amber-500" },
   send_webhook: { label: "send_webhook", icon: Webhook, border: "border-l-primary" },
+  http_request: { label: "http_request", icon: Globe, border: "border-l-sky-500" },
+  ai_agent: { label: "ai_agent", icon: Sparkles, border: "border-l-violet-500" },
   close_conversation: { label: "close_conversation", icon: CircleSlash, border: "border-l-primary" },
 }
 
@@ -141,6 +145,8 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "send_buttons",
   "send_list",
   "send_template",
+  "ai_agent",
+  "http_request",
   "add_tag",
   "remove_tag",
   "assign_conversation",
@@ -215,6 +221,26 @@ function blankConfig(type: AutomationStepType): Record<string, unknown> {
       return { subject: "tag_presence", operand: "", value: "" }
     case "send_webhook":
       return { url: "", headers: {}, body_template: "" }
+    case "http_request":
+      return {
+        method: "POST",
+        url: "",
+        auth_type: "none",
+        auth_token: "",
+        auth_header_name: "x-api-key",
+        headers: {},
+        body_template: '{\n  "nome": "{{contact.name}}",\n  "telefone": "{{contact.phone}}",\n  "mensagem": "{{message.text}}"\n}',
+        response_mappings: [],
+      }
+    case "ai_agent":
+      return {
+        prompt:
+          "Responda o cliente de forma cordial e objetiva em português. Mensagem recebida: {{message.text}}",
+        use_knowledge_base: true,
+        output_mode: "send_whatsapp",
+        output_var: "ai_reply",
+        contact_field: "company",
+      }
     case "close_conversation":
       return {}
     default:
@@ -1584,6 +1610,208 @@ function StepEditor({
           </FieldBlock>
         </>
       )
+    case "http_request": {
+      const method = (cfg.method as string) ?? "POST"
+      const authType = (cfg.auth_type as string) ?? "none"
+      const mappings = Array.isArray(cfg.response_mappings)
+        ? (cfg.response_mappings as { json_path: string; var_name: string }[])
+        : []
+      const updateMapping = (idx: number, patch: { json_path?: string; var_name?: string }) => {
+        const next = mappings.map((m, i) => (i === idx ? { ...m, ...patch } : m))
+        set({ response_mappings: next })
+      }
+      const addMapping = () => {
+        set({ response_mappings: [...mappings, { json_path: "", var_name: "" }] })
+      }
+      const removeMapping = (idx: number) => {
+        set({ response_mappings: mappings.filter((_, i) => i !== idx) })
+      }
+      return (
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-[108px_minmax(0,1fr)] gap-2">
+            <FieldBlock label="Método">
+              <select
+                value={method}
+                onChange={(e) => set({ method: e.target.value })}
+                className="w-full rounded-md border border-border bg-muted px-2 py-1.5 font-mono text-xs text-foreground"
+              >
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+            </FieldBlock>
+            <FieldBlock label="URL da API / Webhook n8n">
+              <Input
+                value={(cfg.url as string) ?? ""}
+                onChange={(e) => set({ url: e.target.value })}
+                placeholder="https://api.externa.com/v1/pedidos?tel={{contact.phone}}"
+                className="bg-muted font-mono text-xs text-foreground"
+              />
+            </FieldBlock>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <FieldBlock label="Autenticação">
+              <select
+                value={authType}
+                onChange={(e) => set({ auth_type: e.target.value })}
+                className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-xs text-foreground"
+              >
+                <option value="none">Nenhuma</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="api_key">Header API Key</option>
+              </select>
+            </FieldBlock>
+            {authType === "api_key" && (
+              <FieldBlock label="Nome do Header">
+                <Input
+                  value={(cfg.auth_header_name as string) ?? "x-api-key"}
+                  onChange={(e) => set({ auth_header_name: e.target.value })}
+                  placeholder="x-api-key"
+                  className="bg-muted font-mono text-xs text-foreground"
+                />
+              </FieldBlock>
+            )}
+          </div>
+
+          {authType !== "none" && (
+            <FieldBlock label={authType === "bearer" ? "Bearer Token" : "Valor da API Key"}>
+              <Input
+                type="password"
+                value={(cfg.auth_token as string) ?? ""}
+                onChange={(e) => set({ auth_token: e.target.value })}
+                placeholder="Cole o token ou chave de acesso"
+                className="bg-muted font-mono text-xs text-foreground"
+              />
+            </FieldBlock>
+          )}
+
+          {method !== "GET" && (
+            <FieldBlock label="Corpo JSON (suporta {{contact.name}}, {{contact.phone}}, {{message.text}}, {{vars.*}})">
+              <Textarea
+                value={(cfg.body_template as string) ?? ""}
+                onChange={(e) => set({ body_template: e.target.value })}
+                className="min-h-24 bg-muted font-mono text-xs text-foreground"
+              />
+            </FieldBlock>
+          )}
+
+          <div className="space-y-1.5 rounded-lg border border-border bg-background/60 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Extrair campos da resposta JSON para variáveis (opcional)
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                onClick={addMapping}
+              >
+                <Plus className="mr-1 size-3" />
+                Variável
+              </Button>
+            </div>
+            {mappings.map((m, idx) => (
+              <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-1.5 items-center">
+                <Input
+                  value={m.json_path}
+                  onChange={(e) => updateMapping(idx, { json_path: e.target.value })}
+                  placeholder="data.status"
+                  className="h-7 bg-muted font-mono text-[11px]"
+                />
+                <Input
+                  value={m.var_name}
+                  onChange={(e) => updateMapping(idx, { var_name: e.target.value })}
+                  placeholder="pedido_status"
+                  className="h-7 bg-muted font-mono text-[11px]"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeMapping(idx)}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            ))}
+            {mappings.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                Use o valor extraído nos passos seguintes com{" "}
+                <code className="font-mono text-foreground">{"{{vars.nome}}"}</code>.
+              </p>
+            )}
+          </div>
+        </div>
+      )
+    }
+    case "ai_agent": {
+      const outputMode = (cfg.output_mode as string) ?? "send_whatsapp"
+      return (
+        <div className="space-y-2.5">
+          <FieldBlock label="Instrução / Prompt para o Agente de IA (Google Gemini ou provedor da conta)">
+            <Textarea
+              value={(cfg.prompt as string) ?? ""}
+              onChange={(e) => set({ prompt: e.target.value })}
+              placeholder="Ex.: Analise a mensagem '{{message.text}}' e os dados '{{vars.pedido_status}}' e responda o cliente de forma amigável."
+              className="min-h-24 bg-muted text-xs text-foreground"
+            />
+          </FieldBlock>
+
+          <label className="flex items-start gap-2 text-xs text-foreground">
+            <input
+              type="checkbox"
+              checked={cfg.use_knowledge_base !== false}
+              onChange={(e) => set({ use_knowledge_base: e.target.checked })}
+              className="mt-0.5 h-3.5 w-3.5 accent-primary"
+            />
+            <span>
+              Consultar Base de Conhecimento do CRM
+              <span className="block text-[11px] text-muted-foreground">
+                Envia trechos relevantes dos documentos cadastrados no Agente de IA junto com o prompt.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <FieldBlock label="Destino da resposta da IA">
+              <select
+                value={outputMode}
+                onChange={(e) => set({ output_mode: e.target.value })}
+                className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-xs text-foreground"
+              >
+                <option value="send_whatsapp">Enviar no WhatsApp (Oficial ou QR Code)</option>
+                <option value="save_variable">Apenas salvar em variável da automação</option>
+                <option value="update_contact_field">Salvar em campo do contato</option>
+              </select>
+            </FieldBlock>
+
+            <FieldBlock label="Nome da variável de saída">
+              <Input
+                value={(cfg.output_var as string) ?? "ai_reply"}
+                onChange={(e) => set({ output_var: e.target.value })}
+                placeholder="ai_reply"
+                className="bg-muted font-mono text-xs text-foreground"
+              />
+            </FieldBlock>
+          </div>
+
+          {outputMode === "update_contact_field" && (
+            <FieldBlock label="Campo do contato para preencher">
+              <ContactFieldSelect
+                value={(cfg.contact_field as string) ?? "company"}
+                onChange={(v) => set({ contact_field: v })}
+                t={t}
+              />
+            </FieldBlock>
+          )}
+        </div>
+      )
+    }
     case "close_conversation":
       return (
         <p className="text-xs text-muted-foreground">
@@ -1647,6 +1875,15 @@ function previewFor(
     }
     case "send_webhook":
       return (step.step_config.url as string) || t("preview.noUrl")
+    case "http_request": {
+      const m = String(step.step_config.method ?? "POST").toUpperCase()
+      const u = (step.step_config.url as string) || t("preview.noUrl")
+      return `${m} ${u}`
+    }
+    case "ai_agent": {
+      const p = ((step.step_config.prompt as string) || "").trim()
+      return p ? `IA: ${p.slice(0, 60)}` : "Agente de IA (Gemini)"
+    }
     default:
       return ""
   }

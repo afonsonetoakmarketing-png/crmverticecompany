@@ -12,6 +12,8 @@ import type {
   SendListStepConfig,
   SendTemplateStepConfig,
   SendWebhookStepConfig,
+  HttpRequestStepConfig,
+  AiAgentStepConfig,
   TagStepConfig,
   UpdateContactFieldStepConfig,
   WaitStepConfig,
@@ -26,6 +28,8 @@ import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
 import { getT } from '@/lib/i18n/translate'
 import { isWithinTimeWindow } from './time-of-day'
+import { executeHttpRequestStep } from './http-request'
+import { executeAiAgentStep } from './ai-agent-step'
 
 /** Step errors land in automation_logs and are shown on the logs page. */
 const tErr = getT('LibErrors.engine')
@@ -986,6 +990,99 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       return `webhook ${res.status}`
     }
 
+    case 'http_request': {
+      const cfg = step.step_config as HttpRequestStepConfig
+      const contactData = await loadContactForInterpolation(db, args)
+      const result = await executeHttpRequestStep({
+        config: cfg,
+        interpolate: (template) => interpolate(template, args, contactData),
+      })
+      if (Object.keys(result.extractedVars).length > 0) {
+        args.context.vars = {
+          ...(args.context.vars ?? {}),
+          ...result.extractedVars,
+        }
+      }
+      return result.summary
+    }
+
+    case 'ai_agent': {
+      const cfg = step.step_config as AiAgentStepConfig
+      if (!cfg.prompt?.trim()) {
+        throw new Error('ai_agent: prompt obrigatório')
+      }
+      const contactData = await loadContactForInterpolation(db, args)
+      const promptText = interpolate(cfg.prompt, args, contactData)
+      const userInputText =
+        (args.context.message_text ?? '').trim() ||
+        `Contato: ${contactData?.name ?? ''} (${contactData?.phone ?? ''})`.trim()
+
+      const aiResult = await executeAiAgentStep({
+        db,
+        accountId: args.automation.account_id,
+        config: cfg,
+        promptText,
+        userInputText,
+      })
+
+      const varName = (cfg.output_var || 'ai_reply').trim()
+      if (varName) {
+        args.context.vars = {
+          ...(args.context.vars ?? {}),
+          [varName]: aiResult.replyText,
+        }
+      }
+
+      if (cfg.output_mode === 'send_whatsapp' && aiResult.replyText) {
+        if (!args.contactId) throw new Error(tErr('needsContact', { step: 'ai_agent' }))
+        const conversationId = await resolveConversationId(args)
+        const { whatsapp_message_id } = await engineSendText({
+          accountId: args.automation.account_id,
+          userId: args.automation.user_id,
+          conversationId,
+          contactId: args.contactId,
+          text: aiResult.replyText,
+        })
+        return `AI (${aiResult.provider}/${aiResult.model}) sent via WhatsApp (${whatsapp_message_id})`
+      }
+
+      if (cfg.output_mode === 'update_contact_field' && cfg.contact_field && args.contactId) {
+        const field = cfg.contact_field.trim()
+        if (field.startsWith('custom:')) {
+          const customFieldId = field.slice('custom:'.length)
+          if (customFieldId) {
+            const { data: cf } = await db
+              .from('custom_fields')
+              .select('id')
+              .eq('id', customFieldId)
+              .eq('account_id', args.automation.account_id)
+              .maybeSingle()
+            if (cf) {
+              await db
+                .from('contact_custom_values')
+                .upsert(
+                  {
+                    contact_id: args.contactId,
+                    custom_field_id: customFieldId,
+                    value: aiResult.replyText,
+                  },
+                  { onConflict: 'contact_id,custom_field_id' },
+                )
+            }
+          }
+        } else if (new Set(['name', 'email', 'company']).has(field)) {
+          await db
+            .from('contacts')
+            .update({ [field]: aiResult.replyText, updated_at: new Date().toISOString() })
+            .eq('id', args.contactId)
+            .eq('account_id', args.automation.account_id)
+        }
+        return `AI (${aiResult.provider}/${aiResult.model}) saved to ${field}`
+      }
+
+      return `AI (${aiResult.provider}/${aiResult.model}) saved to vars.${varName}`
+    }
+
     case 'close_conversation': {
       if (!args.contactId) throw new Error(tErr('needsContact', { step: 'close_conversation' }))
       await db
@@ -1169,11 +1266,35 @@ function waitMs(cfg: WaitStepConfig): number {
   return Math.max(1_000, cfg.amount * unitMs)
 }
 
-function interpolate(s: string, args: ExecuteArgs): string {
+async function loadContactForInterpolation(
+  db: ReturnType<typeof supabaseAdmin>,
+  args: ExecuteArgs,
+): Promise<{ name?: string | null; phone?: string | null; email?: string | null; company?: string | null } | null> {
+  if (!args.contactId) return null
+  const { data } = await db
+    .from('contacts')
+    .select('name, phone, email, company')
+    .eq('id', args.contactId)
+    .eq('account_id', args.automation.account_id)
+    .maybeSingle()
+  return (data as { name?: string | null; phone?: string | null; email?: string | null; company?: string | null } | null) ?? null
+}
+
+function interpolate(
+  s: string,
+  args: ExecuteArgs,
+  contact?: { name?: string | null; phone?: string | null; email?: string | null; company?: string | null } | null,
+): string {
   return s.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key) => {
     const [ns, prop] = String(key).split('.')
     if (ns === 'message' && prop === 'text') return String(args.context.message_text ?? '')
     if (ns === 'vars' && prop) return String(args.context.vars?.[prop] ?? '')
+    if (ns === 'contact' && prop && contact) {
+      if (prop === 'name') return String(contact.name ?? '')
+      if (prop === 'phone') return String(contact.phone ?? '')
+      if (prop === 'email') return String(contact.email ?? '')
+      if (prop === 'company') return String(contact.company ?? '')
+    }
     return ''
   })
 }

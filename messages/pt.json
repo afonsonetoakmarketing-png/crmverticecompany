@@ -1184,6 +1184,8 @@
         "wait": "Aguardar",
         "condition": "Condição (Se/Senão)",
         "send_webhook": "Enviar webhook",
+        "http_request": "HTTP Request Avançado (APIs)",
+        "ai_agent": "Agente de IA (Gemini / LLM)",
         "close_conversation": "Fechar conversa"
       },
       "triggers": {
@@ -1968,6 +1970,7 @@
       "security": "Login e segurança",
       "appearance": "Aparência",
       "whatsapp": "WhatsApp",
+      "n8n": "Integrações & n8n",
       "templates": "Modelos",
       "quick-replies": "Respostas rápidas",
       "fields": "Campos e tags",

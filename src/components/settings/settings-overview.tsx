@@ -212,6 +212,11 @@ export function SettingsOverview({
             })}`,
     },
     {
+      section: 'n8n',
+      loading: false,
+      subtitle: 'Hub n8n, Templates JSON & Deploy Vercel',
+    },
+    {
       section: 'appearance',
       loading: false,
       subtitle: t('appearance', { mode: tAppearance(`modes.${mode}`), theme: themeName }),

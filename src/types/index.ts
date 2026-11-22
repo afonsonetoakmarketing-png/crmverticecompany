@@ -511,6 +511,8 @@ export type AutomationStepType =
   | 'wait'
   | 'condition'
   | 'send_webhook'
+  | 'http_request'
+  | 'ai_agent'
   | 'close_conversation';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
@@ -633,6 +635,30 @@ export interface SendWebhookStepConfig {
   body_template?: string;
 }
 
+export interface HttpRequestResponseMapping {
+  json_path: string;
+  var_name: string;
+}
+
+export interface HttpRequestStepConfig {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url: string;
+  auth_type?: 'none' | 'bearer' | 'api_key';
+  auth_token?: string;
+  auth_header_name?: string;
+  headers?: Record<string, string>;
+  body_template?: string;
+  response_mappings?: HttpRequestResponseMapping[];
+}
+
+export interface AiAgentStepConfig {
+  prompt: string;
+  use_knowledge_base?: boolean;
+  output_mode: 'send_whatsapp' | 'save_variable' | 'update_contact_field';
+  output_var?: string;
+  contact_field?: string;
+}
+
 export type AutomationStepConfig =
   | SendMessageStepConfig
   | SendButtonsStepConfig
@@ -645,6 +671,8 @@ export type AutomationStepConfig =
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
+  | HttpRequestStepConfig
+  | AiAgentStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 

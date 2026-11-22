@@ -1184,6 +1184,8 @@
         "wait": "대기",
         "condition": "조건 (If/Else)",
         "send_webhook": "웹훅 보내기",
+        "http_request": "고급 HTTP 요청",
+        "ai_agent": "AI 에이전트 (Gemini / LLM)",
         "close_conversation": "대화 닫기"
       },
       "triggers": {
@@ -1968,6 +1970,7 @@
       "security": "로그인 & 보안",
       "appearance": "화면 설정",
       "whatsapp": "WhatsApp",
+      "n8n": "n8n 및 Vercel 허브",
       "templates": "템플릿",
       "quick-replies": "빠른 답장",
       "fields": "필드 & 태그",

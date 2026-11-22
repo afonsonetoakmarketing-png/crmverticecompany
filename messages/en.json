@@ -1184,6 +1184,8 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
+        "http_request": "Advanced HTTP Request",
+        "ai_agent": "AI Agent (Gemini / LLM)",
         "close_conversation": "Close Conversation"
       },
       "triggers": {
@@ -1968,6 +1970,7 @@
       "security": "Login & security",
       "appearance": "Appearance",
       "whatsapp": "WhatsApp",
+      "n8n": "n8n & Vercel Hub",
       "templates": "Templates",
       "quick-replies": "Quick replies",
       "fields": "Fields & tags",
