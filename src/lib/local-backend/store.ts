@@ -130,7 +130,7 @@ function createSeedDatabase(): LocalDatabase {
   tables.accounts = [
     {
       id: accountId,
-      name: 'Meu Workspace CRM',
+      name: 'Vértice Company',
       owner_user_id: adminUserId,
       default_currency: 'BRL',
       reply_target_minutes: 15,

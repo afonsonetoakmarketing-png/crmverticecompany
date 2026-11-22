@@ -20,25 +20,37 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+const VERTICE_FAVICON_URL =
+  "/assets/aistudio/Logo_Vertice_Frente_sem_fundo__alta__0a684cf6.png";
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("Metadata");
+  const description = t("description");
   return {
     ...metadata,
-    description: t("description"),
+    description,
+    openGraph: {
+      title: "Vértice Company",
+      description,
+      siteName: "Vértice Company",
+      type: "website",
+    },
   };
 }
 
 const metadata: Metadata = {
   title: {
-    default: "wacrm",
-    template: "%s — wacrm",
+    default: "Vértice Company",
+    template: "%s — Vértice Company",
   },
   robots: {
     index: false,
     follow: false,
   },
   icons: {
-    icon: [{ url: "/icon" }],
+    icon: [{ url: VERTICE_FAVICON_URL, type: "image/png" }],
+    shortcut: [{ url: VERTICE_FAVICON_URL, type: "image/png" }],
+    apple: [{ url: VERTICE_FAVICON_URL, type: "image/png" }],
   },
   formatDetection: {
     email: false,

@@ -14,6 +14,7 @@
  */
 
 export const THEME_IDS = [
+  "vertice",
   "violet",
   "emerald",
   "cobalt",
@@ -23,7 +24,7 @@ export const THEME_IDS = [
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
-export const DEFAULT_THEME: ThemeId = "violet";
+export const DEFAULT_THEME: ThemeId = "vertice";
 
 export const STORAGE_KEY = "wacrm.theme";
 
@@ -37,7 +38,7 @@ export const STORAGE_KEY = "wacrm.theme";
  * opt-in eye-strain-friendly alternative.
  *
  * Persisted under its own localStorage key so it composes freely
- * with the accent choice (you can run Violet-light or Violet-dark).
+ * with the accent choice (you can run Vértice-light or Vértice-dark).
  */
 export const MODES = ["light", "dark"] as const;
 
@@ -68,9 +69,15 @@ export interface ThemeMeta {
 
 export const THEMES: ReadonlyArray<ThemeMeta> = [
   {
+    id: "vertice",
+    name: "Azul Vértice",
+    tagline: "Azul-marinho executivo oficial da Vértice Company.",
+    swatch: "oklch(0.42 0.15 258)",
+  },
+  {
     id: "violet",
     name: "Violet",
-    tagline: "The default — confident, slightly playful.",
+    tagline: "Confident, slightly playful.",
     swatch: "oklch(0.526 0.247 293)",
   },
   {
